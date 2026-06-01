@@ -25,16 +25,8 @@ Whether you are a developer looking to import and extend these workflows or a bu
 
 ## Architecture — AI Lead Capture & Response
 
-```
-Web Form / API
-     │
-     │  HTTPS POST
-     ▼
-┌─────────────┐     ┌──────────────┐     ┌──────────────────┐     ┌─────────┐     ┌──────────────────┐
-│   Webhook   │────▶│  Edit Fields │────▶│  Anthropic Claude│────▶│  Gmail  │────▶│ Respond to       │
-│  (Trigger)  │     │  (Map Data)  │     │  (Generate Reply)│     │  (Send) │     │ Webhook (200 OK) │
-└─────────────┘     └──────────────┘     └──────────────────┘     └─────────┘     └──────────────────┘
-```
+<img width="1261" height="521" alt="image" src="https://github.com/user-attachments/assets/231de8c8-d25a-40a0-a8c9-16a83839d693" />
+
 
 **What it does step by step:**
 
