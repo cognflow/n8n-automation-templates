@@ -9,6 +9,7 @@ When a new client's status is set to \*\*Active\*\* in the Cognflow Notion CRM, 
 
 
 \## Architecture
+<img width="1303" height="623" alt="Screenshot 2026-06-07 121210" src="https://github.com/user-attachments/assets/ab6ea25b-8e81-4485-adb0-e4b2bb205dc8" />
 
 
 
