@@ -1,0 +1,296 @@
+{
+  "name": "P03 — AI Client Onboarding Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "event": "pagedUpdatedInDatabase",
+        "databaseId": {
+          "__rl": true,
+          "value": "eb39c915-e6c2-4705-98f4-7b4b6bbc7fd9",
+          "mode": "list",
+          "cachedResultName": "📋 Client Pipeline",
+          "cachedResultUrl": "https://app.notion.com/p/eb39c915e6c2470598f47b4b6bbc7fd9"
+        }
+      },
+      "type": "n8n-nodes-base.notionTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "69b568cc-ef6c-4600-a4f6-fec6f134eb6b",
+      "name": "Notion Trigger",
+      "credentials": {
+        "notionApi": {
+          "id": "cm2Z2EfgIwiCjk7B",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "72b7a9ed-8a74-4c24-b8f1-94b68afcbf9d",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Active",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "9efb5eaa-7eeb-46b4-820e-9d7b7471ed6a",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": YOUR_ANTHROPIC_API_KEY
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        -96
+      ],
+      "id": "5e893e3b-6e23-4592-83de-671c44a771d6",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('If').item.json.Email }}",
+        "subject": "=Welcome to Cognflow, {{ $('If').item.json['Client Name'] }}!",
+        "emailType": "text",
+        "message": "=\n{{ $('HTTP Request').item.json.content[0].text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        624,
+        -96
+      ],
+      "id": "26ad8021-5e79-4214-9a62-77ce8ef9c92d",
+      "name": "Send a message",
+      "webhookId": "66cd0ada-0404-4e4a-a2a0-aa6a147b8591",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "79XVxZki2dpBtvB4",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "eb39c915-e6c2-4705-98f4-7b4b6bbc7fd9",
+          "mode": "list",
+          "cachedResultName": "📋 Client Pipeline",
+          "cachedResultUrl": "https://app.notion.com/p/eb39c915e6c2470598f47b4b6bbc7fd9"
+        },
+        "title": "={{ $('If').item.json['Client Name'] }} — Workspace\n",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Active"
+            },
+            {
+              "key": "Email|email",
+              "emailValue": "={{ $('If').item.json.Email }}"
+            },
+            {
+              "key": "Business|rich_text",
+              "textContent": "={{ $('If').item.json.Business }}"
+            },
+            {
+              "key": "Budget|number",
+              "numberValue": "={{ $('If').item.json.Budget }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        800,
+        -96
+      ],
+      "id": "52db4ff8-e42c-4a81-8a1e-853064f29808",
+      "name": "Create a database page",
+      "credentials": {
+        "notionApi": {
+          "id": "cm2Z2EfgIwiCjk7B",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0B8R7C9ES1",
+          "mode": "list",
+          "cachedResultName": "cognflow-alerts"
+        },
+        "text": "=🎉 New client onboarded!\n\nClient: {{ $('If').item.json['Client Name'] }}\nCompany: {{ $('If').item.json.Business }}\nEmail: {{ $('If').item.json.Email }}\nBudget: ${{ $('If').item.json.Budget }}\n\nWorkspace created in Notion ✅\nWelcome email sent ✅",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1008,
+        -96
+      ],
+      "id": "349b69e7-63a9-48f9-8c44-97cb6ea46159",
+      "name": "Send a message1",
+      "webhookId": "26d8b59b-6854-40b4-b4c5-e1927cefd46e",
+      "credentials": {
+        "slackApi": {
+          "id": "AwVDiqwymL7OYpga",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const clientName = $('If').item.json['Client Name'];\nconst business = $('If').item.json.Business;\nconst budget = $('If').item.json.Budget;\n\nreturn {\n  body: JSON.stringify({\n    model: \"claude-sonnet-4-5\",\n    max_tokens: 1000,\n    messages: [{\n      role: \"user\",\n      content: `You are a professional onboarding assistant for Cognflow, an AI automation agency. Write a warm, professional welcome email to a new client. Client name: ${clientName}. Company: ${business}. Budget: $${budget}. Keep it under 150 words. Include: a warm welcome, one sentence about what Cognflow will deliver for them, and a clear next step to book an onboarding call. Do not use placeholders.`\n    }]\n  })\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        48
+      ],
+      "id": "1db412f9-63e0-40e8-b595-d8060a601c85",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Notion Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Create a database page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a database page": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "f55da822-ecd1-4c2d-8cac-96dea02e9f45",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ac40c4df33ac9e9e8630f02da91c5114a63fb9a5c908594cebbc12f9a137d6d"
+  },
+  "id": "eMqCUxRessF75qSA",
+  "tags": []
+}
