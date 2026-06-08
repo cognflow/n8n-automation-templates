@@ -1,0 +1,585 @@
+{
+  "name": "P04 — Onboarding Email Sequence",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "onboarding-signup",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        288,
+        -224
+      ],
+      "id": "df837c33-7d06-49aa-a773-fa6e1bb9c3e4",
+      "name": "Webhook",
+      "webhookId": "a4db219d-76cb-47e8-a64c-9ef5b728d7bc"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "46249274-e707-4db8-9d79-76cf04b27fd3",
+              "name": " name",
+              "value": "={{ $json.body.name }}",
+              "type": "string"
+            },
+            {
+              "id": "04fafeb8-ec5c-4a3c-aaf0-bf0c5ac51cee",
+              "name": "email",
+              "value": "={{ $json.body.email }}",
+              "type": "string"
+            },
+            {
+              "id": "9fc2e6aa-d060-4a0f-8be5-42677bd1954e",
+              "name": "plan_type",
+              "value": "={{ $json.body.plan_type }}",
+              "type": "string"
+            },
+            {
+              "id": "ad6e2a14-794c-4a85-9b69-a40c06a06b51",
+              "name": "company",
+              "value": "={{ $json.body.company }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        288,
+        160
+      ],
+      "id": "a883cef9-0ba4-4497-bbd0-6cd184f29f10",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "const name = $input.first().json.name;\nconst email = $input.first().json.email;\nconst plan_type = $input.first().json.plan_type;\nconst company = $input.first().json.company;\n\nreturn {\n  name,\n  email,\n  plan_type,\n  company,\n  email1_body: JSON.stringify({\n    model: \"claude-sonnet-4-5\",\n    max_tokens: 1000,\n    messages: [{\n      role: \"user\",\n      content: `You are a professional onboarding assistant for Cognflow, an AI automation agency. Write a warm, immediate welcome email for a new ${plan_type} plan signup. Name: ${name}. Company: ${company}. Keep it under 120 words. Include: a warm welcome, one sentence about what Cognflow automates for them, and one clear next step. No placeholders.`\n    }]\n  })\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "cc48b9b4-1644-4674-8afe-4335e667882f",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": YOUR_ANTHROPIC_API_KEY
+            },
+            {
+              "name": "anthropic-version ",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.email1_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        576,
+        -112
+      ],
+      "id": "c455c895-c30c-4174-9d22-342b8488faa4",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Edit Fields').item.json.email }}",
+        "subject": "=Welcome to Cognflow, {{ $('Webhook').item.json.body.name }}!",
+        "emailType": "text",
+        "message": "={{ $('HTTP Request').item.json.content[0].text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        48
+      ],
+      "id": "d3da7126-6cd7-4a26-9f1f-fd5d8781bfbc",
+      "name": "Send a message",
+      "webhookId": "d2683277-ec23-4cec-a69f-cd78e65d141c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "79XVxZki2dpBtvB4",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        912,
+        -80
+      ],
+      "id": "89a37b2d-e5a5-4c3e-8bb8-0bac0c7f2c62",
+      "name": "Wait",
+      "webhookId": "38add24c-1356-40b4-a134-61fda527bf34"
+    },
+    {
+      "parameters": {
+        "jsCode": "const name = $('Webhook').item.json.body.name;\nconst email = $('Webhook').item.json.body.email;\nconst plan_type = $('Webhook').item.json.body.plan_type;\nconst company = $('Webhook').item.json.body.company;\n\nreturn {\n  name,\n  email,\n  plan_type,\n  company,\n  email2_body: JSON.stringify({\n    model: \"claude-sonnet-4-5\",\n    max_tokens: 1000,\n    messages: [{\n      role: \"user\",\n      content: `You are a professional onboarding assistant for Cognflow. Write a \"Getting Started\" follow-up email (day 2) for ${name} from ${company} on the ${plan_type} plan. Keep it under 120 words. Focus on one key action they should take right now to get value from Cognflow. Be encouraging and specific. No placeholders.`\n    }]\n  })\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        64
+      ],
+      "id": "27c9e2ff-ea6a-4a96-b4c5-24096a3f8ed4",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_ANTHROPIC_API_KEY"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.email2_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1184,
+        -80
+      ],
+      "id": "f63b9057-ab9d-47a7-bb74-9303a33ff356",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.email }}",
+        "subject": "=Getting Started with Cognflow — {{ $('Webhook').item.json.body.name }}",
+        "emailType": "text",
+        "message": "= {{ $('HTTP Request1').item.json.content[0].text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1312,
+        64
+      ],
+      "id": "1d357802-3eac-4109-8f2b-077e0b8db82d",
+      "name": "Send a message1",
+      "webhookId": "705e1fcd-26d2-43ca-b935-e3a41962cce1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "79XVxZki2dpBtvB4",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1504,
+        -80
+      ],
+      "id": "9338fa87-5be8-47a3-aa5d-dc96157fb751",
+      "name": "Wait1",
+      "webhookId": "0c889a0c-e07c-4987-8fe1-7e86237db6bd"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "eebdbea4-4df1-45d9-b6f0-a1a5a64b14fa",
+              "leftValue": "={{ $('Webhook').item.json.body.plan_type }}",
+              "rightValue": "pro",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1648,
+        128
+      ],
+      "id": "416929d2-35bf-4331-a0ef-cd8352dac361",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const name = $('Webhook').item.json.body.name;\nconst email = $('Webhook').item.json.body.email;\nconst company = $('Webhook').item.json.body.company;\n\nreturn {\n  name,\n  email,\n  company,\n  email3a_body: JSON.stringify({\n    model: \"claude-sonnet-4-5\",\n    max_tokens: 1000,\n    messages: [{\n      role: \"user\",\n      content: `You are a professional onboarding assistant for Cognflow. Write a power-user tips email (day 5) for ${name} from ${company} on the Pro plan. Keep it under 120 words. Share 2-3 advanced Cognflow automation tips that Pro users love. Be specific and energising. No placeholders.`\n    }]\n  })\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        -176
+      ],
+      "id": "504c6ffa-d2f6-4b89-9468-3680753132e8",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_ANTHROPIC_API_KEY"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.email3a_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1920,
+        0
+      ],
+      "id": "b95c6c0f-4523-464b-98ee-4c7f7e08397d",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.email }}",
+        "subject": "=Pro Tips — Get More From Cognflow, {{ $('Webhook').item.json.body.name }}",
+        "emailType": "text",
+        "message": "={{ $('HTTP Request2').item.json.content[0].text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2128,
+        0
+      ],
+      "id": "ac5b8891-ed27-411d-b2d0-8cc766d7da04",
+      "name": "Send a message2",
+      "webhookId": "76bb85aa-c4d3-4598-871b-ef4b6768ede9",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "79XVxZki2dpBtvB4",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const name = $('Webhook').item.json.body.name;\nconst email = $('Webhook').item.json.body.email;\nconst company = $('Webhook').item.json.body.company;\n\nreturn {\n  name,\n  email,\n  company,\n  email3b_body: JSON.stringify({\n    model: \"claude-sonnet-4-5\",\n    max_tokens: 1000,\n    messages: [{\n      role: \"user\",\n      content: `You are a professional onboarding assistant for Cognflow. Write a re-engagement email (day 5) for ${name} from ${company} on the free plan who hasn't upgraded yet. Keep it under 120 words. Be warm and encouraging. Highlight one compelling reason to upgrade to Pro. Include a clear CTA to upgrade. No placeholders.`\n    }]\n  })\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        304
+      ],
+      "id": "1ca416b8-bf8c-44e3-bd2c-5bdb6fce7e05",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_ANTHROPIC_API_KEY"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.email3b_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1952,
+        256
+      ],
+      "id": "37031c6f-5f8f-460f-ae8d-b6c1ea77f4a2",
+      "name": "HTTP Request3"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.email }}",
+        "subject": "=We Miss You — Here's What You're Missing, {{ $('Webhook').item.json.body.name }}",
+        "emailType": "text",
+        "message": "={{ $('HTTP Request2').item.json.content[0].text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2160,
+        256
+      ],
+      "id": "2a792851-0063-468e-bd9d-d30cf9126540",
+      "name": "Send a message3",
+      "webhookId": "2373fd51-ca3a-4b12-9122-8e00e41e12e9",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "79XVxZki2dpBtvB4",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "Send a message3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d5182cac-4cbd-431a-bdfd-b60ef059c73e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ac40c4df33ac9e9e8630f02da91c5114a63fb9a5c908594cebbc12f9a137d6d"
+  },
+  "id": "FqqBnpmXGJ5g0A9M",
+  "tags": []
+}
