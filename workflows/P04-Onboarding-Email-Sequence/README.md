@@ -1,4 +1,6 @@
 \# P04 — Onboarding Email Sequence
+<img width="1284" height="564" alt="Screenshot 2026-06-08 065413" src="https://github.com/user-attachments/assets/d89cbb13-defc-464d-98c3-f598a8b8fe2b" />
+
 
 
 
