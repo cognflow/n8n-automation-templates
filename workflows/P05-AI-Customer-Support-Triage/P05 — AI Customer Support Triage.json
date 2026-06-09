@@ -1,0 +1,496 @@
+{
+  "name": "P05 — AI Customer Support Triage",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "p05-support-triage",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -240,
+        -128
+      ],
+      "id": "949e71e9-8feb-44ef-a3dd-0f334bb37797",
+      "name": "Webhook",
+      "webhookId": "bf5538d6-285c-403b-97d7-bf8ecd28d9d9"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "47295388-3079-461c-9089-42dcf077c534",
+              "name": "=name",
+              "value": "={{ $json.body.name }}",
+              "type": "string"
+            },
+            {
+              "id": "2b87a2ed-a4a5-43d3-855a-bb1f3757975f",
+              "name": "=email",
+              "value": "={{ $json.body.email }}",
+              "type": "string"
+            },
+            {
+              "id": "5f2f981f-1f51-415b-8078-a261a91fde30",
+              "name": "=message",
+              "value": "={{ $json.body.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -64,
+        -64
+      ],
+      "id": "e0a552f0-800b-4777-80a7-b3ba5fc885f4",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "const name = $input.item.json.name;\nconst email = $input.item.json.email;\nconst message = $input.item.json.message;\n\nconst payload = {\n  model: \"claude-opus-4-5\",\n  max_tokens: 1024,\n  system: `You are a customer support triage assistant. Analyze the customer message and respond ONLY with a valid JSON object in this exact format, no other text:\n{\n  \"category\": \"billing | technical | general | refund | cancellation\",\n  \"urgency\": \"low | medium | high\",\n  \"summary\": \"one sentence summary of the issue\",\n  \"draft_reply\": \"a professional, empathetic reply to the customer\"\n}`,\n  messages: [\n    {\n      role: \"user\",\n      content: `Customer Name: ${name}\\nCustomer Email: ${email}\\nMessage: ${message}`\n    }\n  ]\n};\n\nreturn { json: { payload, name, email } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        -80
+      ],
+      "id": "1b78fa56-7db0-4378-812d-b4c35947c65a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        272,
+        32
+      ],
+      "id": "ccb78ab7-a0cc-42fb-9f82-92d434a58f8f",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "E1rOfvaAkecPbWxk",
+          "name": "Anthropic Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.item.json;\nconst name = $('Edit Fields').item.json.name;\nconst email = $('Edit Fields').item.json.email;\n\n// Extract the text content from Claude's response\nlet rawText = response.content[0].text;\n\n// Strip markdown code fences if present\nrawText = rawText.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n\n// Parse the JSON string Claude returned\nconst parsed = JSON.parse(rawText);\n\nreturn {\n  json: {\n    category: parsed.category,\n    urgency: parsed.urgency,\n    summary: parsed.summary,\n    draft_reply: parsed.draft_reply,\n    name: name,\n    email: email\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -112
+      ],
+      "id": "bd4d121b-d295-44f2-a148-bfb9fc6d8839",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": " billing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "9939b8a1-524b-4b09-97b5-48d9963ebbe9"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "billing"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "204f1ab1-9a2d-4545-a71f-dac14b03f09e",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "=technical",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "technical"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "3c62afc8-c892-4193-b1eb-25bc02df9831",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "general",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "general"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "6fa6cc1a-ecd8-4481-888b-2365aa9fb931",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "refund",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "refund"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "acffbe4b-71fd-48f9-a6cd-c9a713d91db5",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "cancellation",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancellation"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        656,
+        -112
+      ],
+      "id": "8bece523-4e61-4859-ba90-0e66f21ecba2",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=[Support] {{ $json.category }} - {{ $json.urgency }} priority",
+        "emailType": "text",
+        "message": "={{ $json.draft_reply }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        928,
+        -256
+      ],
+      "id": "6ca58f77-334f-46f2-b864-348fc8e7d4ed",
+      "name": "Send a message",
+      "webhookId": "239e9946-ac34-4077-941e-342c26218eb1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "79XVxZki2dpBtvB4",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0B8R7C9ES1",
+          "mode": "list",
+          "cachedResultName": "cognflow-alerts"
+        },
+        "text": "=*New Technical Issue*\\nFrom: {{ $json.name }} ({{ $json.email }})\\nUrgency: {{ $json.urgency }}\\nSummary: {{ $json.summary }}\\n\\nDraft Reply:\\n{{ $json.draft_reply }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        960,
+        -128
+      ],
+      "id": "08971946-8a4f-418e-8e45-10b44d97f0a9",
+      "name": "Send a message1",
+      "webhookId": "e47223ce-aec0-493a-9755-b2c1b4eb6438",
+      "credentials": {
+        "slackApi": {
+          "id": "AwVDiqwymL7OYpga",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=[Support] {{ $json.category }} - {{ $json.urgency }} priority",
+        "emailType": "text",
+        "message": "={{ $json.draft_reply }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        -16
+      ],
+      "id": "faa8a58c-9f49-4e4f-928a-c2e2651bc51c",
+      "name": "Send a message2",
+      "webhookId": "08d7ec06-78bc-407c-b199-011304d3ed40",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "79XVxZki2dpBtvB4",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"success\", \"category\": \"{{ $json.category }}\", \"urgency\": \"{{ $json.urgency }}\" }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1248,
+        -192
+      ],
+      "id": "b7093aa8-3230-4368-a776-433ef4f13b73",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "64aacf42-d0c4-4e19-b86b-b0ca8a6ad7c8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ac40c4df33ac9e9e8630f02da91c5114a63fb9a5c908594cebbc12f9a137d6d"
+  },
+  "id": "DPTABCPW6PGnuVcI",
+  "tags": []
+}
