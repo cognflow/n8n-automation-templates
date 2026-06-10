@@ -5,6 +5,7 @@
 An automated invoice processing pipeline that accepts PDF invoices via three input methods, extracts structured data using Claude AI, and writes the results to a Google Sheet for tracking.
 
 ## Final Architecture (Phase 3)
+<img width="1292" height="560" alt="image" src="https://github.com/user-attachments/assets/aeb69fc3-a4e4-4df0-8c3e-811ab195dd3f" />
 
 ```
 Webhook (POST /invoice-upload)
