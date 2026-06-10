@@ -1,0 +1,304 @@
+{
+  "name": "P06 - Invoice Processing Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "data0",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        288,
+        0
+      ],
+      "id": "35f0a0bf-1f9a-413d-8861-fd162ea59589",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "const invoiceText = $input.item.json.text;\n\nconst payload = {\n  model: \"claude-opus-4-5\",\n  max_tokens: 1000,\n  system: `You are an invoice data extraction assistant. \nExtract structured data from the invoice text provided and return ONLY a valid JSON object with no markdown, no code fences, no explanation.\n\nReturn exactly this schema:\n{\n  \"invoice_number\": \"\",\n  \"vendor\": \"\",\n  \"date\": \"\",\n  \"due_date\": \"\",\n  \"total_amount\": \"\",\n  \"currency\": \"\",\n  \"status\": \"unpaid\"\n}`,\n  messages: [\n    {\n      role: \"user\",\n      content: `Extract the invoice data from this text:\\n\\n${invoiceText}`\n    }\n  ]\n};\n\nreturn { json: payload };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        0
+      ],
+      "id": "4ef329ca-f620-4852-9121-5c3f1ff1e285",
+      "name": "Build Claude Payload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "={{ $json.model }}"
+            },
+            {
+              "name": "max_tokens",
+              "value": "={{ $json.max_tokens }}"
+            },
+            {
+              "name": "system",
+              "value": "={{ $json.system }}"
+            },
+            {
+              "name": "messages",
+              "value": "={{ $json.messages }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        784,
+        0
+      ],
+      "id": "d5d6aa77-5415-402d-9c38-8cf2639467d7",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "E1rOfvaAkecPbWxk",
+          "name": "Anthropic Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $input.item.json.content[0].text;\n\n// Strip markdown fences if present\nconst cleaned = rawText.replace(/```json|```/g, '').trim();\n\nconst invoice = JSON.parse(cleaned);\n\nreturn { json: invoice };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        0
+      ],
+      "id": "497bd54f-21c9-43e9-a2b0-82f519463cfc",
+      "name": "Parse JSON Response"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1_anaWWxUDnLZi0tmmOvtzLyc1WVPSGCYeXMX1gFgM9k",
+          "mode": "list",
+          "cachedResultName": " Cognflow Invoice Tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1_anaWWxUDnLZi0tmmOvtzLyc1WVPSGCYeXMX1gFgM9k/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1_anaWWxUDnLZi0tmmOvtzLyc1WVPSGCYeXMX1gFgM9k/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "invoice_number": "={{ $json.invoice_number }}",
+            "vendor": "={{ $json.vendor }}",
+            "date": "={{ $json.date }}",
+            "due_date": "={{ $json.due_date }}",
+            "total_amount": "={{ $json.total_amount }}",
+            "currency": "={{ $json.currency }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [
+            "invoice_number"
+          ],
+          "schema": [
+            {
+              "id": "invoice_number",
+              "displayName": "invoice_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vendor",
+              "displayName": "vendor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total_amount",
+              "displayName": "total_amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "currency",
+              "displayName": "currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1200,
+        0
+      ],
+      "id": "64575c5f-1816-4f07-9610-274fb639ed01",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "U3HXU8tgljnfvej3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "invoice-upload",
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4730f3f1-e2ed-4c61-b580-57f34cecabd9",
+      "name": "Webhook",
+      "webhookId": "3154810c-1eef-43e8-b8d7-6abba9b08c3a"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Build Claude Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Claude Payload": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON Response": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "aeaa0b08-e439-468a-bf78-543d3284bf79",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ac40c4df33ac9e9e8630f02da91c5114a63fb9a5c908594cebbc12f9a137d6d"
+  },
+  "id": "bDxkqfnmpdk0dtCH",
+  "tags": []
+}
