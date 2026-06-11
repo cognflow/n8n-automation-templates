@@ -1,0 +1,290 @@
+{
+  "name": "P07-Social-Media-Content-Pipeline.json",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8f4f8007-fb9e-4b58-8b49-f534a4f72fa6",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "04da1d07-b783-4d75-b904-68c3c1cbc266",
+          "mode": "list",
+          "cachedResultName": "P07 — Content Queue",
+          "cachedResultUrl": "https://app.notion.com/p/04da1d07b7834d75b90468c3c1cbc266"
+        },
+        "limit": 1,
+        "simple": false,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Status|select",
+              "condition": "equals",
+              "selectValue": "Ready"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "8367d0b9-a69b-4ced-8367-3b64d5042eec",
+      "name": "Get many database pages",
+      "credentials": {
+        "notionApi": {
+          "id": "cm2Z2EfgIwiCjk7B",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const page = $input.first().json;\n\nconst topic = page.properties?.Topic?.title?.[0]?.plain_text ?? 'No topic found';\nconst tone = page.properties?.Tone?.select?.name ?? 'Not set';\nconst audience = page.properties['Target Audience']?.rich_text?.[0]?.plain_text ?? 'Not set';\nconst pageId = page.id;\n\nreturn [{ json: { pageId, topic, tone, audience } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "e60ce873-f722-4df3-94b0-5c34f433a5eb",
+      "name": "Extract Content Fields"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "ANTHROPIC_API_KEY_PLACEHOLDER"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"model\": \"claude-sonnet-4-5\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a LinkedIn content writer for a Cloud and DevOps Engineer.\\n\\nWrite a LinkedIn post based on the following:\\n\\nTopic: How I deployed a production EKS cluster with Terraform and IRSA in under 2 hours\\nTone: Technical\\nTarget Audience: DevOps engineers, cloud architects, hiring managers\\n\\nRequirements:\\n- Strong opening hook (no generic openers)\\n- 150-250 words\\n- Practical insight or lesson\\n- Clear call to action\\n- 3-5 relevant hashtags at the end\\n\\nRespond with ONLY a JSON object in this format:\\n{\\n  \\\"post\\\": \\\"the full LinkedIn post text here\\\"\\n}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        624,
+        0
+      ],
+      "id": "5fda00df-a81b-4074-9f12-5534bd9d14b3",
+      "name": "Generate LinkedIn Post"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\nconst rawText = response.content[0].text;\n\nconst clean = rawText.replace(/```json|```/g, '').trim();\n\nconst parsed = JSON.parse(clean);\n\n// Sanitize post text for JSON embedding\nconst post = parsed.post.replace(/\\n/g, '\\\\n').replace(/\\r/g, '');\n\nreturn [{ json: { post } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        0
+      ],
+      "id": "bbc93b44-8fad-42f5-a26f-c2f7afc1cc9a",
+      "name": "Parse Claude Response"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "=={{ $('Extract Content Fields').item.json.pageId }}",
+          "mode": "url"
+        },
+        "simple": false,
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "=Status"
+            },
+            {
+              "key": "=Published"
+            },
+            {
+              "key": "=Published At"
+            },
+            {
+              "key": "=={{ new Date().toISOString() }}"
+            },
+            {
+              "key": "=Post Preview"
+            },
+            {
+              "key": "=={{ $('Parse Claude Response').item.json.post }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "e5f15931-5245-4c29-8c6f-6b1a5771b4f6",
+      "name": "Update Content Status",
+      "credentials": {
+        "notionApi": {
+          "id": "cm2Z2EfgIwiCjk7B",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/v2/ugcPosts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer PLACEHOLDER_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"author\": \"urn:li:person:YOUR_LINKEDIN_ID\",\n  \"lifecycleState\": \"PUBLISHED\",\n  \"specificContent\": {\n    \"com.linkedin.ugc.ShareContent\": {\n      \"shareCommentary\": {\n        \"text\": \"={{ $json.post }}\"\n      },\n      \"shareMediaCategory\": \"NONE\"\n    }\n  },\n  \"visibility\": {\n    \"com.linkedin.ugc.MemberNetworkVisibility\": \"PUBLIC\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "be4c3d65-6eb4-41ee-945d-659aa4428560",
+      "name": "Post to LinkedIn"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many database pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many database pages": {
+      "main": [
+        [
+          {
+            "node": "Extract Content Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Content Fields": {
+      "main": [
+        [
+          {
+            "node": "Generate LinkedIn Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate LinkedIn Post": {
+      "main": [
+        [
+          {
+            "node": "Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Claude Response": {
+      "main": [
+        [
+          {
+            "node": "Post to LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Update Content Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b08ad9be-2fc2-4165-a55a-ccce853b4521",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ac40c4df33ac9e9e8630f02da91c5114a63fb9a5c908594cebbc12f9a137d6d"
+  },
+  "id": "jWc0Rl5oqlHUArEJ",
+  "tags": []
+}
