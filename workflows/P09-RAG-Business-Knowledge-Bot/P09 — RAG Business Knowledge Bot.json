@@ -1,0 +1,316 @@
+{
+  "name": "P09 — RAG Business Knowledge Bot.",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -416,
+        112
+      ],
+      "id": "1ab99af3-7858-4068-bc68-4cd21915d802",
+      "name": "When chat message received",
+      "webhookId": "fe521040-9252-402e-950d-f7cfd46c277e"
+    },
+    {
+      "parameters": {
+        "url": "https://api.notion.com/v1/blocks/3790f5a5c7e681a0b304f6bfca4b54a3/children",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -256,
+        112
+      ],
+      "id": "ccfa3ab9-7be9-4955-98c8-3e282dd7f6fc",
+      "name": "Fetch Notion SOPs",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "M91QAdLHYtysuXie",
+          "name": "Notion - Cognflow"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const blocks = items[0].json.results;\n\nconst chunks = [];\n\nfor (const block of blocks) {\n  const type = block.type;\n  const content = block[type];\n  \n  if (!content || !content.rich_text) continue;\n  \n  const text = content.rich_text\n    .map(rt => rt.plain_text)\n    .join('')\n    .trim();\n  \n  if (text.length === 0) continue;\n  \n  chunks.push({\n    json: {\n      text: text,\n      source: 'Cognflow SOPs',\n      block_id: block.id,\n      type: type\n    }\n  });\n}\n\nreturn chunks;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        112
+      ],
+      "id": "62947a7b-aca1-4065-8302-1adb07d05380",
+      "name": "Extract + Chunk Text"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cohere.com/v1/embed",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \"model\": \"embed-english-v3.0\", \"input_type\": \"search_document\", \"texts\": $('Extract + Chunk Text').all().map(item => item.json.text) }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        96,
+        112
+      ],
+      "id": "32c77449-d4a9-4145-aabe-f1c6f4cc2ea7",
+      "name": "Generate Embeddings",
+      "executeOnce": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YktK1yeKFk75UMdi",
+          "name": "Cohere - Cognflow"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\n// All items coming in are the batched embedding response\n// The embeddings array contains all 26 vectors\nconst embeddingsData = items[0].json.embeddings;\nconst textsData = items[0].json.texts;\n\nconst vectorStore = [];\n\nfor (let i = 0; i < textsData.length; i++) {\n  vectorStore.push({\n    text: textsData[i],\n    embedding: embeddingsData[i],\n    source: 'Cognflow SOPs'\n  });\n}\n\nstaticData.vectorStore = vectorStore;\n\nreturn [{ json: { stored: vectorStore.length, status: 'Vector store built successfully' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        112
+      ],
+      "id": "ea6bc0fd-539b-4be3-b36b-2aa5255c4d50",
+      "name": "Build Vector Store"
+    },
+    {
+      "parameters": {
+        "jsCode": "const question = $('When chat message received').item.json.chatInput;\n\nreturn [{ json: { question: question } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        -224
+      ],
+      "id": "f4b8c82c-17a0-4d6c-8761-eda72f60bf9d",
+      "name": "Embed User Question"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cohere.com/v1/embed",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \"model\": \"embed-english-v3.0\", \"input_type\": \"search_query\", \"texts\": [$json.question] }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        32,
+        -64
+      ],
+      "id": "93f80f06-98de-4117-b518-bb0d291adf2f",
+      "name": "Embed Question",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YktK1yeKFk75UMdi",
+          "name": "Cohere - Cognflow"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get query embedding - use $json directly (input from Embed Question)\nconst queryEmbedding = $json.embeddings[0];\nconst question = $('Embed User Question').first().json.question;\n\n// Retrieve vector store from static data\nconst staticData = $getWorkflowStaticData('global');\nconst vectorStore = staticData.vectorStore;\n\nif (!vectorStore || vectorStore.length === 0) {\n  return [{ json: { error: 'Vector store is empty. Run the index build pipeline first.' } }];\n}\n\nfunction cosineSimilarity(a, b) {\n  let dot = 0, normA = 0, normB = 0;\n  for (let i = 0; i < a.length; i++) {\n    dot += a[i] * b[i];\n    normA += a[i] * a[i];\n    normB += b[i] * b[i];\n  }\n  return dot / (Math.sqrt(normA) * Math.sqrt(normB));\n}\n\nconst scored = vectorStore.map(chunk => ({\n  text: chunk.text,\n  source: chunk.source,\n  score: cosineSimilarity(queryEmbedding, chunk.embedding)\n}));\n\nconst topChunks = scored\n  .sort((a, b) => b.score - a.score)\n  .slice(0, 5);\n\nconst context = topChunks.map(c => c.text).join('\\n\\n');\n\nreturn [{ json: { question, context, topChunks } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -64
+      ],
+      "id": "4a64f4fb-c7bf-4484-9c03-a6b8abe582a4",
+      "name": "Similarity Search"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \"model\": \"claude-sonnet-4-5\", \"max_tokens\": 1024, \"messages\": [{ \"role\": \"user\", \"content\": \"You are the Cognflow AI assistant. Answer the question using only the context below.\\n\\nContext:\\n\" + $('Similarity Search').item.json.context + \"\\n\\nQuestion: \" + $('Similarity Search').item.json.question }] }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        -64
+      ],
+      "id": "ba69dc36-ff4b-40eb-8635-517dcdd6ad93",
+      "name": "Ask Claude",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "E1rOfvaAkecPbWxk",
+          "name": "Anthropic Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json.content[0].text;\n\nreturn [{ json: { output: response } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        -64
+      ],
+      "id": "acd31cee-5257-452e-9d10-bccbc731fbd0",
+      "name": "Format Response"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Fetch Notion SOPs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Notion SOPs": {
+      "main": [
+        [
+          {
+            "node": "Extract + Chunk Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract + Chunk Text": {
+      "main": [
+        [
+          {
+            "node": "Generate Embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Build Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed User Question": {
+      "main": [
+        [
+          {
+            "node": "Embed Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Question": {
+      "main": [
+        [
+          {
+            "node": "Similarity Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Similarity Search": {
+      "main": [
+        [
+          {
+            "node": "Ask Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Claude": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Embed User Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "24951b0b-9c5f-4443-95d2-a749f4c43f72",
+  "meta": {
+    "instanceId": "3ac40c4df33ac9e9e8630f02da91c5114a63fb9a5c908594cebbc12f9a137d6d"
+  },
+  "id": "qwE618DERxhYzukA",
+  "tags": []
+}
