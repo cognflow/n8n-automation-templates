@@ -1,0 +1,357 @@
+{
+  "name": "P08 — AI Proposal Generator.",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "32719f8a-71f8-444b-ab25-b6c5f879e5de",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b51b7204-6633-43d8-8ba6-9e8c7a189bd0",
+              "name": "clientName",
+              "value": "Acme Technologies",
+              "type": "string"
+            },
+            {
+              "id": "17876f12-1363-41b7-9221-78d30e1ecfa3",
+              "name": "industry",
+              "value": "Financial Services",
+              "type": "string"
+            },
+            {
+              "id": "74a2df5c-83bb-41d0-b1ed-f2473bf43812",
+              "name": "projectScope",
+              "value": "Build a cloud-native payment processing platform on AWS with Kubernetes, CI/CD pipeline, and real-time monitoring",
+              "type": "string"
+            },
+            {
+              "id": "1a0221b3-3ed1-44a0-a36b-049c05f14323",
+              "name": "budget",
+              "value": "$50,000 - $75,000",
+              "type": "string"
+            },
+            {
+              "id": "a1e26d00-20e1-4dd5-9fe6-8dd70d715d97",
+              "name": "timeline",
+              "value": "3 months",
+              "type": "string"
+            },
+            {
+              "id": "9e61f8b1-fc0b-4707-9985-966179a1fed5",
+              "name": "contactEmail",
+              "value": "cto@acmetech.com",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        144,
+        -48
+      ],
+      "id": "6a8d8c41-3324-47f7-b9fc-3470725a8d97",
+      "name": "Set Client Brief."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "ANTHROPIC_API_KEY_PLACEHOLDER"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-5\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a senior technical consultant writing a professional project proposal.\\n\\nClient: {{ $json.clientName }}\\nIndustry: {{ $json.industry }}\\nProject Scope: {{ $json.projectScope }}\\nBudget: {{ $json.budget }}\\nTimeline: {{ $json.timeline }}\\n\\nWrite a professional project proposal with these exact sections:\\n1. Executive Summary\\n2. Project Scope & Objectives\\n3. Proposed Solution\\n4. Timeline & Milestones\\n5. Investment & ROI\\n6. Why Us\\n7. Next Steps\\n\\nRespond with ONLY a valid JSON object. Do not use newlines or line breaks inside any JSON string values. Write each section as a single continuous paragraph. Use this exact format:\\n{\\\"title\\\": \\\"proposal title\\\", \\\"executiveSummary\\\": \\\"...\\\", \\\"scopeAndObjectives\\\": \\\"...\\\", \\\"proposedSolution\\\": \\\"...\\\", \\\"timelineAndMilestones\\\": \\\"...\\\", \\\"investmentAndROI\\\": \\\"...\\\", \\\"whyUs\\\": \\\"...\\\", \\\"nextSteps\\\": \\\"...\\\"}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        320,
+        16
+      ],
+      "id": "2bbf23dc-eced-4a55-981c-601c39364dff",
+      "name": "Generate Proposal"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\nlet rawText = response.content[0].text;\n\nrawText = rawText.replace(/^```json\\s*/,'').replace(/```\\s*$/,'').trim();\n\n// Replace ALL whitespace control characters except spaces\nrawText = rawText.replace(/[\\u0000-\\u001F\\u007F]/g, (char) => {\n  if (char === '\\t') return ' ';\n  return ' ';\n});\n\nconst parsed = JSON.parse(rawText);\n\nreturn [{ json: parsed }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -48
+      ],
+      "id": "a571fe59-5016-43a6-a4c2-9076d3139251",
+      "name": "Parse Proposal"
+    },
+    {
+      "parameters": {
+        "folderId": "default",
+        "title": "=={{ $json.title }}"
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        688,
+        48
+      ],
+      "id": "b03491a9-664a-4791-922a-38b8b95f6c9b",
+      "name": "Create Proposal Doc",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "cRdXHe60uwGVZZsu",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const proposal = $('Parse Proposal').first().json;\nconst docId = $input.first().json.id;\n\nconst text = `Executive Summary\\n${proposal.executiveSummary}\\n\\nScope & Objectives\\n${proposal.scopeAndObjectives}\\n\\nProposed Solution\\n${proposal.proposedSolution}\\n\\nTimeline & Milestones\\n${proposal.timelineAndMilestones}\\n\\nInvestment & ROI\\n${proposal.investmentAndROI}\\n\\nWhy Us\\n${proposal.whyUs}\\n\\nNext Steps\\n${proposal.nextSteps}\\n`;\n\nconst requests = [{ insertText: { location: { index: 1 }, text } }];\n\nconst body = JSON.stringify({ requests });\n\n// Debug — check first 200 chars of body\nconsole.log('BODY PREVIEW:', body.substring(0, 200));\n\nreturn [{ json: { docId, body, bodyPreview: body.substring(0, 500) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        -48
+      ],
+      "id": "e9e2ff40-904a-4b4f-9244-5c9d99360a66",
+      "name": "Build Doc Content"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "==https://docs.google.com/document/d/{{ $json.docId }}/edit",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "text": "=={{ $('Parse Proposal').item.json.executiveSummary + '\\n\\nScope & Objectives\\n' + $('Parse Proposal').item.json.scopeAndObjectives + '\\n\\nProposed Solution\\n' + $('Parse Proposal').item.json.proposedSolution + '\\n\\nTimeline & Milestones\\n' + $('Parse Proposal').item.json.timelineAndMilestones + '\\n\\nInvestment & ROI\\n' + $('Parse Proposal').item.json.investmentAndROI + '\\n\\nWhy Us\\n' + $('Parse Proposal').item.json.whyUs + '\\n\\nNext Steps\\n' + $('Parse Proposal').item.json.nextSteps }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        64
+      ],
+      "id": "6cf70a59-36f7-4343-a99a-8a580bfcd070",
+      "name": "Update a document",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "cRdXHe60uwGVZZsu",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "=={{ $('Set Client Brief.').item.json.contactEmail }}",
+        "subject": "=={{ $('Parse Proposal').item.json.title }}",
+        "emailType": "text",
+        "message": "=={{ 'Dear Client,\\n\\nPlease find your proposal here:\\nhttps://docs.google.com/document/d/' + $('Build Doc Content').item.json.docId + '/edit\\n\\nBest regards,\\nCognflow' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1232,
+        -48
+      ],
+      "id": "a89da766-1104-4eef-8cc0-543a8b4af193",
+      "name": "Send Proposal Email",
+      "webhookId": "55aa3d0b-3da4-4f30-9da3-ac382362c801",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "79XVxZki2dpBtvB4",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "68d5e469-c8a9-459f-9b02-18c4bcb4eca3",
+          "mode": "list",
+          "cachedResultName": "📋 Client Pipeline",
+          "cachedResultUrl": "https://app.notion.com/p/68d5e469c8a9459f9b0218c4bcb4eca3"
+        },
+        "title": "=={{ $('Set Client Brief.').item.json.clientName }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Client Name|title",
+              "title": "=={{ $('Set Client Brief.').item.json.clientName }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "Proposal Sent"
+            },
+            {
+              "key": "Notes|rich_text",
+              "richText": "=={{ 'Doc: https://docs.google.com/document/d/' + $('Build Doc Content').item.json.docId + '/edit' }}",
+              "text": {
+                "text": [
+                  {
+                    "text": "=={{ 'Doc: https://docs.google.com/document/d/' + $('Build Doc Content').item.json.docId + '/edit' }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        -48
+      ],
+      "id": "90406a9b-fbf0-4e59-99ff-6b18e2b04e8a",
+      "name": "Create a database page",
+      "credentials": {
+        "notionApi": {
+          "id": "cm2Z2EfgIwiCjk7B",
+          "name": "Notion account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set Client Brief.",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Client Brief.": {
+      "main": [
+        [
+          {
+            "node": "Generate Proposal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Proposal": {
+      "main": [
+        [
+          {
+            "node": "Parse Proposal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Proposal": {
+      "main": [
+        [
+          {
+            "node": "Create Proposal Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Proposal Doc": {
+      "main": [
+        [
+          {
+            "node": "Build Doc Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Doc Content": {
+      "main": [
+        [
+          {
+            "node": "Update a document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a document": {
+      "main": [
+        [
+          {
+            "node": "Send Proposal Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Proposal Email": {
+      "main": [
+        [
+          {
+            "node": "Create a database page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "230ed01a-66f9-40b5-b266-e4103badbe50",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ac40c4df33ac9e9e8630f02da91c5114a63fb9a5c908594cebbc12f9a137d6d"
+  },
+  "id": "5KotMycXIxitK1Lw",
+  "tags": []
+}
