@@ -1,0 +1,709 @@
+{
+  "name": "P10-Autonomous AI Sales Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "p10-sales-agent",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "cfaff822-1996-459b-a7bf-db590346c33a",
+      "name": "Webhook",
+      "webhookId": "361f63a8-1e4f-4eb5-9597-d1ada9607bf3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7cafa752-2790-400d-968b-7897c3c60cd5",
+              "name": "name",
+              "value": "={{ $json.body.name }}",
+              "type": "string"
+            },
+            {
+              "id": "cd70dbc1-ab5b-41b8-b1df-729d00914578",
+              "name": "business",
+              "value": "={{ $json.body.business }}",
+              "type": "string"
+            },
+            {
+              "id": "fa2c5b7c-caf9-412d-8f71-98237350e202",
+              "name": "email",
+              "value": "={{ $json.body.email }}",
+              "type": "string"
+            },
+            {
+              "id": "d7705c1c-ca17-43f1-ae14-db616a222661",
+              "name": "budget",
+              "value": "={{ $json.body.budget }}",
+              "type": "number"
+            },
+            {
+              "id": "8fef93a9-c32b-4e28-8d70-09b3106f8cc0",
+              "name": "pain_point",
+              "value": "={{ $json.body.pain_point }}",
+              "type": "string"
+            },
+            {
+              "id": "99087be9-0f57-4508-9e26-87d0c7e4b42a",
+              "name": "source",
+              "value": "={{ $json.body.source }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        -352
+      ],
+      "id": "70d0321c-f165-45fa-a5ae-27d635af2dcf",
+      "name": "Extract Lead Fields"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version ",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-5\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a sales qualification agent for Cognflow, an n8n automation agency that builds AI-powered business workflows for SMEs.\\n\\nAnalyse this lead and return ONLY a valid JSON object with no markdown, no explanation, no code fences.\\n\\nLead details:\\n- Name: {{ $json.name }}\\n- Business: {{ $json.business }}\\n- Email: {{ $json.email }}\\n- Budget: ${{ $json.budget }}\\n- Pain Point: {{ $json.pain_point }}\\n- Source: {{ $json.source }}\\n\\nReturn this exact structure:\\n{\\n  \\\"score\\\": <integer 1-10>,\\n  \\\"qualified\\\": <true or false>,\\n  \\\"intent\\\": \\\"<one sentence summary of what they need>\\\",\\n  \\\"reason\\\": \\\"<one sentence explaining the score>\\\",\\n  \\\"suggested_service\\\": \\\"<the Cognflow service that best fits this lead>\\\"\\n}\\n\\nScoring rules:\\n- Score 7-10: Clear pain point, budget ≥ $500, automation use case fits n8n\\n- Score 4-6: Vague pain point or low budget or unclear fit\\n- Score 1-3: No clear automation need or budget too low\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        272,
+        -16
+      ],
+      "id": "41b22df1-ae20-4d19-b74d-60de45fbe195",
+      "name": "Qualify Lead",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "E1rOfvaAkecPbWxk",
+          "name": "Anthropic Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.item.json.content[0].text;\nconst cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\nconst parsed = JSON.parse(cleaned);\n\nreturn {\n  json: {\n    score: parsed.score,\n    qualified: parsed.qualified,\n    intent: parsed.intent,\n    reason: parsed.reason,\n    suggested_service: parsed.suggested_service,\n    name: $('Extract Lead Fields').item.json.name,\n    business: $('Extract Lead Fields').item.json.business,\n    email: $('Extract Lead Fields').item.json.email,\n    budget: $('Extract Lead Fields').item.json.budget,\n    pain_point: $('Extract Lead Fields').item.json.pain_point,\n    source: $('Extract Lead Fields').item.json.source\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -208
+      ],
+      "id": "757090fb-65ca-4eef-a10b-8a63ecedf30a",
+      "name": "Parse Qualification."
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.qualified }}",
+                    "rightValue": " true",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "3e6c9597-f7cf-4f4d-b64a-9de4ea502467"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Qualified"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "5f622e57-ea4c-4a86-8074-bdc697c6341c",
+                    "leftValue": "={{ $json.qualified }}",
+                    "rightValue": "false ",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Unqualified"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        528,
+        64
+      ],
+      "id": "ee0342b9-4c3e-465f-94ed-12fe21af4ee9",
+      "name": "Route Lead"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "68d5e469-c8a9-459f-9b02-18c4bcb4eca3",
+          "mode": "list",
+          "cachedResultName": "📋 Client Pipeline",
+          "cachedResultUrl": "https://app.notion.com/p/68d5e469c8a9459f9b0218c4bcb4eca3"
+        },
+        "title": "={{ $json.name }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Client Name|title",
+              "title": "={{ $json.name }}"
+            },
+            {
+              "key": "Business|rich_text",
+              "textContent": "={{ $json.business }}"
+            },
+            {
+              "key": "Email|email",
+              "emailValue": "={{ $json.email }}"
+            },
+            {
+              "key": "Budget|number",
+              "numberValue": "={{ $json.budget }}"
+            },
+            {
+              "key": "Source|select",
+              "selectValue": "LinkedIn"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "Contacted"
+            },
+            {
+              "key": "Notes|rich_text",
+              "textContent": "={{ $json.intent }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        736,
+        -384
+      ],
+      "id": "64b8d68d-f4f1-4999-a911-9e45268d7625",
+      "name": "Create Notion Record.",
+      "credentials": {
+        "notionApi": {
+          "id": "cm2Z2EfgIwiCjk7B",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.notion.com/v1/blocks/3790f5a5c7e681a0b304f6bfca4b54a3/children",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version ",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        896,
+        -96
+      ],
+      "id": "7ccb7aa6-97d2-4315-b750-e819da25c29c",
+      "name": "Fetch SOPs",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "M91QAdLHYtysuXie",
+          "name": "Notion - Cognflow"
+        },
+        "notionApi": {
+          "id": "cm2Z2EfgIwiCjk7B",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const blocks = $input.item.json.results;\n\nconst sopText = blocks\n  .map(block => {\n    const type = block.type;\n    const richText = block[type]?.rich_text || [];\n    return richText.map(rt => rt.plain_text).join('');\n  })\n  .filter(line => line.trim() !== '')\n  .join('\\n');\n\nreturn {\n  json: {\n    sop_context: sopText,\n   name: $('Parse Qualification.').item.json.name,\n    business: $('Parse Qualification.').item.json.business,\n    email: $('Parse Qualification.').item.json.email,\n    budget: $('Parse Qualification.').item.json.budget,\n    pain_point: $('Parse Qualification.').item.json.pain_point,\n    source: $('Parse Qualification.').item.json.source,\n    score: $('Parse Qualification.').item.json.score,\n    intent: $('Parse Qualification.').item.json.intent,\n    suggested_service: $('Parse Qualification.').item.json.suggested_service\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        -240
+      ],
+      "id": "74f621eb-4918-4d80-9513-93162df9bddc",
+      "name": "Extract SOP Text"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version ",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.request_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1376,
+        -192
+      ],
+      "id": "8fc7da7a-8774-4190-a1d9-ae4a2b44dbc0",
+      "name": "Generate Outreach Email",
+      "credentials": {
+        "anthropicApi": {
+          "id": "TE8QgjcrdDUJavv5",
+          "name": "Anthropic account"
+        },
+        "httpHeaderAuth": {
+          "id": "E1rOfvaAkecPbWxk",
+          "name": "Anthropic Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sopClean = $json.sop_context.replace(/\\n/g, ' ').replace(/\"/g, \"'\");\nconst painClean = $json.pain_point.replace(/\\n/g, ' ').replace(/\"/g, \"'\");\n\nconst content = `You are a sales agent for Cognflow, an n8n automation agency.\\n\\nWrite a short personalised outreach email.\\n\\nLead:\\n- Name: ${$json.name}\\n- Business: ${$json.business}\\n- Pain Point: ${painClean}\\n- Suggested Service: ${$json.suggested_service}\\n- Score: ${$json.score}/10\\n\\nSOPs:\\n${sopClean}\\n\\nRequirements:\\n- Start with Subject: <subject line>\\n- Address by first name\\n- Reference their pain point\\n- Show how Cognflow solves it\\n- Under 150 words\\n- CTA to book discovery call\\n- Sign off: Samuel | Cognflow\\n- Plain text only`;\n\nconst notesUpdate = $json.intent + ' | Outreach sent via Cognflow AI Sales Agent.';\n\nreturn {\n  json: {\n    request_body: JSON.stringify({\n      model: \"claude-sonnet-4-5\",\n      max_tokens: 1024,\n      messages: [{ role: \"user\", content: content }]\n    }),\n    notion_update_body: JSON.stringify({\n      properties: {\n        Notes: {\n          rich_text: [{ text: { content: notesUpdate } }]\n        }\n      }\n    }),\n    lead_email: $json.email,\n    lead_name: $json.name,\n    score: $json.score,\n    intent: $json.intent,\n    suggested_service: $json.suggested_service,\n    notion_page_id: $('Create Notion Record.').item.json.id\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        -16
+      ],
+      "id": "17712b8f-5814-498b-9031-13c6d285de56",
+      "name": "Build Email Prompt"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.item.json.content[0].text;\nconst lines = raw.split('\\n');\n\nconst subjectLine = lines.find(l => l.startsWith('Subject:'));\nconst subject = subjectLine ? subjectLine.replace('Subject:', '').trim() : 'Cognflow — Automation for Your Business';\nconst body = lines.filter(l => !l.startsWith('Subject:')).join('\\n').trim();\n\nreturn {\n  json: {\n    subject,\n    body,\n    lead_email: $('Build Email Prompt').item.json.lead_email,\n    lead_name: $('Build Email Prompt').item.json.lead_name,\n    score: $('Build Email Prompt').item.json.score,\n    intent: $('Build Email Prompt').item.json.intent,\n    suggested_service: $('Build Email Prompt').item.json.suggested_service,\n    notion_page_id: $('Build Email Prompt').item.json.notion_page_id\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        112
+      ],
+      "id": "4c74d2d4-bb3d-4320-b215-21a25b85f52d",
+      "name": "Parse Email"
+    },
+    {
+      "parameters": {
+        "sendTo": "= {{ $json.lead_email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1584,
+        -64
+      ],
+      "id": "3b0772d4-d8ef-4d6f-ba85-9ba8ec584bf3",
+      "name": "Send Outreach Email",
+      "webhookId": "4306fe02-f76a-492c-a091-6de2288d7585",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "79XVxZki2dpBtvB4",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.notion.com/v1/pages/' + $('Parse Email').item.json.notion_page_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version ",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "= {{ $('Build Email Prompt').item.json.notion_update_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1632,
+        208
+      ],
+      "id": "2bf48614-28de-41e9-8b15-133a2578ee69",
+      "name": "Update Notion Record",
+      "credentials": {
+        "notionApi": {
+          "id": "cm2Z2EfgIwiCjk7B",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0B8R7C9ES1",
+          "mode": "list",
+          "cachedResultName": "cognflow-alerts"
+        },
+        "text": "={{ '🔥 *HOT LEAD — Score ' + $('Parse Email').item.json.score + '/10*\\n\\n*Name:* ' + $('Parse Email').item.json.lead_name + '\\n*Email:* ' + $('Parse Email').item.json.lead_email + '\\n*Service:* ' + $('Parse Email').item.json.suggested_service + '\\n*Intent:* ' + $('Parse Email').item.json.intent + '\\n\\nOutreach email sent. Check Notion Client Pipeline for full record.' }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1840,
+        208
+      ],
+      "id": "c8ec1315-2f8e-43be-b338-48beeb00f558",
+      "name": "Slack Hot Lead Alert",
+      "webhookId": "5812aef1-8ec0-48b3-be6b-86e94ae617c0",
+      "credentials": {
+        "slackApi": {
+          "id": "AwVDiqwymL7OYpga",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "68d5e469-c8a9-459f-9b02-18c4bcb4eca3",
+          "mode": "list",
+          "cachedResultName": "📋 Client Pipeline",
+          "cachedResultUrl": "https://app.notion.com/p/68d5e469c8a9459f9b0218c4bcb4eca3"
+        },
+        "title": "={{ $json.name }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Business|rich_text",
+              "textContent": "={{ $json.business }}"
+            },
+            {
+              "key": "Email|email",
+              "emailValue": "={{ $json.email }}"
+            },
+            {
+              "key": "Budget|number",
+              "numberValue": "={{ $json.budget }}"
+            },
+            {
+              "key": "Source|select",
+              "selectValue": "= {{ $json.source }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "=Lost"
+            },
+            {
+              "key": "Notes|rich_text",
+              "textContent": "={{ $json.reason }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        736,
+        160
+      ],
+      "id": "dcd62858-bb87-4a7e-895c-4bda1efa18dd",
+      "name": "Create Notion Record - Lost",
+      "credentials": {
+        "notionApi": {
+          "id": "cm2Z2EfgIwiCjk7B",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "Thanks for reaching out to Cognflow",
+        "emailType": "text",
+        "message": "={{ 'Hi ' + $json.name.split(' ')[0] + ',\\n\\nThank you for your interest in Cognflow. Based on what you\\'ve shared, we don\\'t think we\\'re the right fit at this stage — but we\\'d love to reconnect as your needs evolve.\\n\\nFeel free to reach out anytime.\\n\\nSamuel | Cognflow' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        944,
+        160
+      ],
+      "id": "e39dc996-800b-4f86-b25d-db090c21fd00",
+      "name": "Send Nurture Email",
+      "webhookId": "09504b0e-9b3d-43a3-b0ce-8bee44dab2f0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "79XVxZki2dpBtvB4",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Lead Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Lead Fields": {
+      "main": [
+        [
+          {
+            "node": "Qualify Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qualify Lead": {
+      "main": [
+        [
+          {
+            "node": "Parse Qualification.",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Qualification.": {
+      "main": [
+        [
+          {
+            "node": "Route Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Lead": {
+      "main": [
+        [
+          {
+            "node": "Create Notion Record.",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Notion Record - Lost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Notion Record.": {
+      "main": [
+        [
+          {
+            "node": "Fetch SOPs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch SOPs": {
+      "main": [
+        [
+          {
+            "node": "Extract SOP Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract SOP Text": {
+      "main": [
+        [
+          {
+            "node": "Build Email Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email Prompt": {
+      "main": [
+        [
+          {
+            "node": "Generate Outreach Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Outreach Email": {
+      "main": [
+        [
+          {
+            "node": "Parse Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Email": {
+      "main": [
+        [
+          {
+            "node": "Send Outreach Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Outreach Email": {
+      "main": [
+        [
+          {
+            "node": "Update Notion Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notion Record": {
+      "main": [
+        [
+          {
+            "node": "Slack Hot Lead Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Notion Record - Lost": {
+      "main": [
+        [
+          {
+            "node": "Send Nurture Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7378cfe8-4323-471e-91f6-3519ef157184",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ac40c4df33ac9e9e8630f02da91c5114a63fb9a5c908594cebbc12f9a137d6d"
+  },
+  "id": "kThqN9tbzYsK1MUG",
+  "tags": []
+}
