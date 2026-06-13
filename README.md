@@ -1,185 +1,253 @@
 # Cognflow — n8n Automation Templates
 
-> Production-ready n8n workflows for AI-powered business automation.
-> Built for agencies and businesses that want to automate intelligently.
+> Production-ready AI-powered workflows built with n8n, Claude, Notion, Gmail, Slack, and more.
+
+**10 workflows. 1 agency. Built from scratch.**
+
+This repository is the complete Cognflow automation portfolio — a library of production-grade n8n workflows covering lead generation, client onboarding, AI content creation, invoice processing, RAG knowledge retrieval, and autonomous sales operations.
+
+Each workflow is fully documented, tested with real data, and ready to import into any n8n instance.
 
 ---
 
-## What is Cognflow?
+## Stack
 
-Cognflow is an AI automation agency that helps businesses eliminate repetitive manual tasks using intelligent, no-code workflows. This repository contains a growing library of production-ready n8n workflow templates — each one built, tested, and ready to deploy.
-
-Whether you are a developer looking to import and extend these workflows or a business owner evaluating automation solutions, this repository gives you a clear picture of what's possible.
+| Tool | Role |
+|------|------|
+| [n8n](https://n8n.io) | Workflow engine (self-hosted via Docker) |
+| [Anthropic Claude](https://anthropic.com) | AI reasoning, generation, and qualification |
+| [Notion API](https://developers.notion.com) | CRM, knowledge base, and logging |
+| [Gmail API](https://developers.google.com/gmail) | Automated email sending |
+| [Slack API](https://api.slack.com) | Real-time alerts |
+| [Cohere](https://cohere.com) | Text embeddings for RAG |
+| [Google Docs API](https://developers.google.com/docs) | Document generation |
 
 ---
 
 ## Workflow Catalogue
 
-| # | Workflow | Description | Trigger | AI |
-|---|----------|-------------|---------|-----|
-| 01 | [AI Lead Capture & Response](./AI%20Lead%20Capture%20%26%20Response.json) | Receives a lead via webhook, generates a personalised email using Claude, and sends it via Gmail automatically | Webhook (HTTP POST) | Anthropic Claude |
+### P01 — AI Lead Capture & Response
+**Trigger:** Webhook (HTTP POST)
 
-> More workflows coming soon — customer support automation, invoice processing, lead qualification, and social media content pipelines.
+Receives an inbound lead via webhook, passes their details to Claude, generates a personalised response email, and sends it via Gmail — all in under 3 seconds.
+
+**Nodes:** Webhook → Edit Fields → Claude (HTTP Request) → Gmail → Respond to Webhook
+
+**Key pattern:** Claude prompt engineering for personalised email generation. Header Auth for Anthropic API.
 
 ---
 
-## Architecture — AI Lead Capture & Response
+### P02 — Automated Invoice Generator
+**Trigger:** Webhook / Manual
 
-<img width="1261" height="521" alt="image" src="https://github.com/user-attachments/assets/231de8c8-d25a-40a0-a8c9-16a83839d693" />
+Generates professional invoices automatically based on client and project data. Outputs a structured invoice document and delivers it to the client.
 
+**Key pattern:** Dynamic document generation, structured data mapping.
 
-**What it does step by step:**
+---
 
-1. **Lead submits a form** — name, email, business name, and message are sent as a JSON payload via HTTPS POST to the n8n webhook endpoint
-2. **Edit Fields node** — maps and cleans the incoming data so downstream nodes receive predictable field names
-3. **Anthropic Claude API** — receives the lead details and generates a warm, personalised email response in under 2 seconds
-4. **Gmail node** — sends the AI-generated email directly to the lead's inbox via Gmail OAuth2
-5. **Respond to Webhook** — returns a `200 OK` JSON response to the originating system confirming successful processing
+### P03 — AI Client Onboarding Engine
+**Trigger:** Notion status change (Active)
 
-**Data flow:**
-```json
-Input:
-{
-  "name": "Ada Okafor",
-  "email": "ada@example.com",
-  "business": "TechCrush Logistics",
-  "message": "I need help automating my customer onboarding"
-}
+Fires automatically when a client is marked Active in the Notion CRM. Sends a multi-step onboarding sequence — welcome email, resource links, and next steps — without any manual effort.
 
-Output (email sent to lead):
-  Subject: Re: Your Automation Enquiry
-  Body: AI-generated personalised response (< 150 words)
+**Nodes:** Webhook → Extract Fields → Claude → Gmail (Welcome Email) → Notion Log
 
-Webhook response:
-{
-  "status": "success",
-  "message": "Thank you, we will be in touch shortly."
-}
+**Key pattern:** `$('Webhook').item.json.body.fieldname` for cross-node data reference. Wait node for stateful sequencing.
+
+---
+
+### P04 — Onboarding Email Sequence
+**Trigger:** Webhook
+
+Sends a structured multi-email onboarding sequence triggered on client signup. Each email is timed and personalised using Claude.
+
+**Key pattern:** Wait node for delayed sends. Dynamic Claude API payload construction in a Code node.
+
+---
+
+### P05 — AI Customer Support Triage
+**Trigger:** Webhook (inbound support request)
+
+Receives a support message, uses Claude to classify it by category and urgency, generates a draft reply, and routes it via Switch node to the appropriate handler — human escalation or automated response.
+
+**Nodes:** Webhook → Claude Triage → Parse JSON → Switch (category/urgency) → Gmail / Slack
+
+**Key pattern:** Strict JSON schema prompting from Claude (`category`, `urgency`, `summary`, `draft_reply`). Markdown fence stripping before `JSON.parse()`. Switch node routing on extracted fields.
+
+---
+
+### P06 — Invoice Processing Pipeline
+**Trigger:** Webhook / Email attachment
+
+Processes incoming invoice data, extracts key fields, logs to Notion, and triggers payment tracking workflows.
+
+**Key pattern:** Structured data extraction, Notion database logging.
+
+---
+
+### P07 — Social Media Content Pipeline
+**Trigger:** Schedule / Manual
+
+Generates platform-optimised social media content (LinkedIn, Twitter/X, Instagram) from a brief using Claude, queues posts, and prepares them for publishing.
+
+**Key pattern:** Multi-platform prompt variations from a single brief. Content queue management in Notion.
+
+> ⚠️ LinkedIn publishing pending OAuth token setup.
+
+---
+
+### P08 — AI Proposal Generator
+**Trigger:** Webhook (client brief submission)
+
+Takes a client brief and autonomously generates a full 7-section business proposal using Claude. Writes the proposal to a Google Doc, then sends the document link via Gmail to the client.
+
+**Nodes:** Webhook → Extract Brief → Claude (7-section proposal) → Google Docs API (create doc) → Gmail (send link) → Notion (log)
+
+**Key pattern:** Dynamic Google Docs creation via API. Long-form structured generation with Claude. Document URL extraction and embedding in Gmail body.
+
+---
+
+### P09 — RAG Business Knowledge Bot
+**Trigger:** n8n Chat UI
+
+A fully in-memory RAG pipeline — no vector database required. Fetches Cognflow SOPs from Notion, chunks and embeds the content via Cohere (`embed-english-v3.0`), stores vectors using `$getWorkflowStaticData('global')`, retrieves the top matching chunks via cosine similarity, and answers business questions using Claude.
+
+**Nodes:** Chat Trigger → Fetch SOPs → Extract + Chunk → Cohere Embed (documents) → Build Vector Store → Cohere Embed (query) → Cosine Similarity Search → Claude → Format Response
+
+**Key patterns:**
+- `input_type: search_document` vs `search_query` distinction (Cohere)
+- Batch embedding in a single HTTP request to avoid rate limits
+- Cosine similarity in a Code node (pure JavaScript, no external library)
+- `$getWorkflowStaticData('global')` as in-memory vector store
+- `$('NodeName').all()` for cross-branch upstream data reference
+
+---
+
+### P10 — Autonomous AI Sales Agent
+**Trigger:** Webhook (lead form submission)
+
+The flagship Cognflow workflow. A fully autonomous sales pipeline — no human input required from lead entry to outreach sent.
+
+Receives a lead, uses Claude to qualify and score them (1–10), routes qualified vs unqualified via Switch, creates a Notion CRM record, fetches internal SOPs as RAG context, generates a personalised outreach email with Claude, sends it via Gmail, updates the CRM with an audit trail, and fires a Slack hot lead alert.
+
+**Nodes:**
+```
+Webhook
+→ Extract Lead Fields
+→ Qualify Lead              (Claude — JSON score + intent)
+→ Parse Qualification       (Code — fence strip + JSON.parse)
+→ Route Lead                (Switch — Qualified ≥ 6 / Unqualified < 6)
+   ├── QUALIFIED
+   │   → Create Notion Record       (Status: Contacted)
+   │   → Fetch SOPs                 (Notion Blocks API)
+   │   → Extract SOP Text           (Code — plain text)
+   │   → Build Email Prompt         (Code — JSON.stringify body)
+   │   → Generate Outreach Email    (Claude — personalised email)
+   │   → Parse Email                (Code — subject + body split)
+   │   → Send Outreach Email        (Gmail)
+   │   → Update Notion Record       (PATCH — audit trail)
+   │   → Slack Hot Lead Alert       (#cognflow-alerts)
+   └── UNQUALIFIED
+       → Create Notion Record - Lost
+       → Send Nurture Email         (Gmail)
+```
+
+**Key patterns:**
+- Agentic lead scoring with structured Claude output
+- `JSON.stringify()` in Code node to safely inject dynamic content into HTTP Request bodies
+- Notion record creation (POST) + update (PATCH) in same pipeline
+- RAG-lite SOP context injection into outreach generation (reuses P09 patterns)
+- Full CRM loop: lead in → Notion created → email sent → Notion updated → Slack alerted
+
+---
+
+## Repository Structure
+
+```
+cognflow/n8n-automation-templates/
+├── README.md
+└── workflows/
+    ├── P01-AI-Lead-Capture-Response/
+    │   ├── README.md
+    │   └── p01-ai-lead-capture-response.json
+    ├── P03-AI-Client-Onboarding-Engine/
+    │   ├── README.md
+    │   └── p03-ai-client-onboarding-engine.json
+    ├── P04-Onboarding-Email-Sequence/
+    │   └── ...
+    ├── P05-AI-Customer-Support-Triage/
+    │   └── ...
+    ├── P06-Invoice-Processing-Pipeline/
+    │   └── ...
+    ├── P07-Social-Media-Content-Pipeline/
+    │   └── ...
+    ├── P08-AI-Proposal-Generator/
+    │   └── ...
+    ├── P09-RAG-Business-Knowledge-Bot/
+    │   ├── README.md
+    │   └── p09-rag-business-knowledge-bot.json
+    └── P10-Autonomous-AI-Sales-Agent/
+        ├── README.md
+        └── p10-autonomous-ai-sales-agent.json
 ```
 
 ---
 
-## Prerequisites
+## Quick Start
 
-Before importing any workflow you will need:
-
-- **n8n** — self-hosted via Docker or n8n Cloud
-  ```bash
-  docker run -it --rm --name n8n -p 5678:5678 n8nio/n8n
-  ```
-- **Anthropic API key** — get one at [console.anthropic.com](https://console.anthropic.com)
-- **Gmail OAuth2 credentials** — set up via Google Cloud Console (see setup guide below)
-
----
-
-## Setup Guide
-
-### 1. Import the Workflow
-
-1. Open your n8n instance at `http://localhost:5678`
-2. Click **New Workflow** → **...** menu → **Import from file**
-3. Select the `.json` file from this repository
-4. Click **Import**
-
-### 2. Configure Anthropic Credentials
-
-1. Open the **HTTP Request** node in the workflow
-2. Under **Send Headers**, find the `x-api-key` header
-3. Replace `YOUR_ANTHROPIC_API_KEY_HERE` with your actual Anthropic API key
-4. Save
-
-> **Security note:** Never commit your API key to a public repository. Use n8n's built-in credential manager or environment variables in production.
-
-### 3. Configure Gmail OAuth2
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project and enable the **Gmail API**
-3. Create **OAuth 2.0 credentials** (Web Application type)
-4. Add this redirect URI:
-   ```
-   http://localhost:5678/rest/oauth2-credential/callback
-   ```
-5. In n8n, open the **Gmail node** → **Credentials** → **Create New**
-6. Paste your **Client ID** and **Client Secret**
-7. Click **Sign in with Google** and authorise access
-
-### 4. Test the Workflow
-
-1. Click the **Webhook** node → **Listen for test event**
-2. Send a test payload:
-
-**PowerShell:**
-```powershell
-Invoke-RestMethod -Uri "http://localhost:5678/webhook-test/lead-capture" `
-  -Method POST `
-  -ContentType "application/json" `
-  -Body '{"name":"Ada Okafor","email":"your@email.com","business":"Test Co","message":"I need automation help"}'
-```
-
-**curl (Linux/Mac):**
+### Prerequisites
+- n8n self-hosted via Docker:
 ```bash
-curl -X POST http://localhost:5678/webhook-test/lead-capture \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Ada Okafor","email":"your@email.com","business":"Test Co","message":"I need automation help"}'
+docker run -it --rm --name n8n -p 5678:5678 -v n8n_data:/home/node/.n8n n8nio/n8n
 ```
+- Anthropic API key — [console.anthropic.com](https://console.anthropic.com)
+- Notion integration token — [notion.so/my-integrations](https://notion.so/my-integrations)
+- Gmail OAuth2 credentials — Google Cloud Console
 
-3. Check your inbox — an AI-generated email should arrive within seconds
+### Import a Workflow
+1. Open n8n at `http://localhost:5678`
+2. Click **New Workflow** → **⋮** menu → **Import from file**
+3. Select the `.json` file from any workflow folder
+4. Configure credentials (API keys, OAuth)
+5. Activate and test
+
+### Credentials Setup
+
+**Anthropic (Claude):**
+- Authentication: Generic Credential Type → Header Auth
+- Header Name: `x-api-key`
+- Header Value: your Anthropic API key
+
+**Notion:**
+- Authentication: Predefined Credential Type → Notion API
+- Token: your Notion integration secret
+
+**Gmail / Slack:**
+- Authentication: OAuth2 (follow n8n's built-in OAuth flow)
 
 ---
 
-## Environment Variables
+## Test Payload (P10)
 
-For production deployments, store sensitive values as environment variables:
-
-| Variable | Description |
-|----------|-------------|
-| `ANTHROPIC_API_KEY` | Your Anthropic API key |
-| `GMAIL_CLIENT_ID` | Google OAuth2 Client ID |
-| `GMAIL_CLIENT_SECRET` | Google OAuth2 Client Secret |
-
----
-
-## Customisation
-
-**Change the AI model:**
-In the HTTP Request node body, update the `model` field:
-```json
-"model": "claude-opus-4-6"
+```powershell
+$body = '{"name":"Adaeze Okonkwo","business":"Okonkwo Logistics Ltd","email":"adaeze@okonkwologistics.com","budget":1500,"pain_point":"We manually send invoices and follow-up emails every week. It takes 2 days of staff time and we keep missing payments. We need this automated.","source":"LinkedIn"}'
+[System.IO.File]::WriteAllText("C:\temp\p10_lead.json", $body)
+curl.exe -X POST http://localhost:5678/webhook-test/p10-sales-agent -H "Content-Type: application/json" --data-binary "@C:\temp\p10_lead.json"
 ```
-
-**Change the email tone or length:**
-Edit the prompt inside the HTTP Request node body. The current prompt instructs Claude to:
-- Address the lead by first name
-- Acknowledge their specific problem
-- Suggest a discovery call
-- Keep the response under 150 words
-
-**Add a CRM integration:**
-After the Edit Fields node, add a HubSpot, Airtable, or Notion node to log the lead before Claude generates the response.
-
----
-
-## Roadmap
-
-Upcoming workflow templates:
-
-- [ ] AI Customer Support — classify and auto-respond to support emails
-- [ ] Lead Qualification — score leads by deal value and route to the right team
-- [ ] Invoice Processing — extract data from PDF invoices and log to Google Sheets
-- [ ] Social Media Content Pipeline — generate and schedule posts from a content brief
-- [ ] Onboarding Email Sequence — trigger a multi-step onboarding flow on signup
 
 ---
 
 ## About Cognflow
 
-Cognflow builds AI-powered automation workflows for businesses that want to work smarter. We design, build, and deploy n8n automations that connect your tools, respond to your leads, and process your data — without manual effort.
+Cognflow builds AI-powered automation workflows for businesses that want to eliminate manual, repetitive work. We design, build, and deploy n8n automations that connect your tools, respond to your leads, process your documents, and run your operations — without human effort.
 
-**Contact:** [samklinofficial91@gmail.com](mailto:samklinofficial91@gmail.com)
-**GitHub:** [github.com/cognflow](https://github.com/cognflow)
+**Contact:** samklinofficial91@gmail.com
+**LinkedIn:** [linkedin.com/in/igwe-ogaji](https://linkedin.com/in/igwe-ogaji)
+**GitHub:** [github.com/samklin92](https://github.com/samklin92)
 
 ---
 
 ## License
 
-MIT — feel free to use, modify, and distribute these templates. Attribution appreciated.
+MIT — free to use, modify, and distribute. Attribution appreciated.
