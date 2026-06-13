@@ -1,6 +1,8 @@
 # P07 — Social Media Content Pipeline
 
 ## Overview
+<img width="1294" height="536" alt="image" src="https://github.com/user-attachments/assets/ba1384e0-724a-4ac9-8584-59c5a835e2bd" />
+
 A fully autonomous content generation and publishing pipeline. Runs on a schedule, reads a content queue from Notion, generates LinkedIn posts via Claude API, publishes directly to LinkedIn, and writes status back to Notion.
 
 This is the first Cognflow workflow to publish autonomously to an external platform.
