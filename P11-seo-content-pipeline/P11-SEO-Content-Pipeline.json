@@ -1,0 +1,423 @@
+{
+  "name": "P11 - SEO Content Pipeline (Research -> Brief -> Agentic Draft -> WordPress)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "a1f3d8c0-0001-4a00-9000-000000000001",
+      "name": "Weekly Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "seo-pipeline-trigger",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "a1f3d8c0-0002-4a00-9000-000000000002",
+      "name": "Manual Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 460]
+    },
+    {
+      "parameters": {
+        "jsCode": "// NOTE: This node sets the target keyword for the run.\n// In production this would come from the webhook body\n// (Manual Webhook Trigger) or a queue of pending keywords\n// in Notion/Sheets. Hardcoded here for demo purposes.\n\nconst targetKeyword = $input.first().json.keyword || \"best project management software for remote teams\";\n\nreturn [\n  {\n    json: {\n      target_keyword: targetKeyword,\n      run_started_at: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "id": "a1f3d8c0-0003-4a00-9000-000000000003",
+      "name": "Set Target Keyword",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// SIMULATED SERP / COMPETITOR SCRAPE\n// ============================================================\n// This node stands in for a real scraping step. In production,\n// replace this Code node with an HTTP Request node calling a\n// SERP API (e.g. SerpApi, DataForSEO, ScraperAPI) using the\n// target_keyword from the previous node, then a parsing step\n// to extract the same fields this mock produces below.\n//\n// SWAP POINT: Replace this entire node with:\n//   HTTP Request -> GET https://serpapi.com/search\n//     params: { q: target_keyword, api_key: {{$credentials}} }\n//   -> Code node to map results into the same shape below\n//      (title, url, word_count, headings[], meta_description)\n// ============================================================\n\nconst keyword = $('Set Target Keyword').first().json.target_keyword;\n\n// Mocked top-5 SERP results for the demo keyword.\nconst mockCompetitors = [\n  {\n    title: \"15 Best Project Management Software for Remote Teams in 2026\",\n    url: \"https://example-competitor-1.com/pm-software-remote\",\n    word_count: 3200,\n    headings: [\n      \"What to Look for in Remote PM Software\",\n      \"Top Picks Compared\",\n      \"Pricing Breakdown\",\n      \"Integrations to Consider\",\n      \"FAQs\"\n    ],\n    meta_description: \"Compare the 15 best project management tools built for distributed and remote teams, with pricing and feature breakdowns.\"\n  },\n  {\n    title: \"Best Remote Team PM Tools: Our 2026 Buyer's Guide\",\n    url: \"https://example-competitor-2.com/buyers-guide\",\n    word_count: 2800,\n    headings: [\n      \"Why Remote Teams Need Different Tools\",\n      \"Our Top 10 Recommendations\",\n      \"Async Collaboration Features\",\n      \"Time Zone Handling\",\n      \"Verdict\"\n    ],\n    meta_description: \"Our 2026 buyer's guide to the best project management software for distributed teams, ranked and compared.\"\n  },\n  {\n    title: \"10 Project Management Apps That Actually Work for Remote Teams\",\n    url: \"https://example-competitor-3.com/apps-remote-teams\",\n    word_count: 2400,\n    headings: [\n      \"The Remote Work Problem\",\n      \"App Comparison Table\",\n      \"Best for Small Teams\",\n      \"Best for Enterprise\",\n      \"Final Thoughts\"\n    ],\n    meta_description: \"A practical comparison of 10 project management apps that actually hold up for distributed, remote-first teams.\"\n  }\n];\n\nreturn [\n  {\n    json: {\n      target_keyword: keyword,\n      competitor_data: mockCompetitors,\n      source: \"SIMULATED - replace with live SERP API call\"\n    }\n  }\n];"
+      },
+      "id": "a1f3d8c0-0004-4a00-9000-000000000004",
+      "name": "Simulated Competitor Research [MOCK]",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"claude-sonnet-4-6\",\n  max_tokens: 4096,\n  messages: [\n    {\n      role: \"user\",\n      content: `You are an SEO content strategist. Based on the competitor data below for the target keyword \"${$json.target_keyword}\", produce a content brief.\\n\\nCompetitor data:\\n${JSON.stringify($json.competitor_data, null, 2)}\\n\\nReturn ONLY raw JSON (no markdown fences, no commentary) matching exactly this schema:\\n{\\n  \\\"target_keyword\\\": string,\\n  \\\"recommended_title\\\": string,\\n  \\\"recommended_word_count\\\": number,\\n  \\\"required_headings\\\": string[],\\n  \\\"related_keywords\\\": string[],\\n  \\\"meta_description\\\": string,\\n  \\\"content_gaps\\\": string[]\\n}\\n\\nBase recommended_word_count on the competitor average, required_headings on patterns across competitors plus at least one gap they all missed, and content_gaps on anything none of the competitors covered well.`\n    }\n  ]\n}) }}"
+      },
+      "id": "a1f3d8c0-0005-4a00-9000-000000000005",
+      "name": "Claude: Generate SEO Brief",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Strip markdown fences before parsing - Claude wraps JSON in\n// ```json fences by default despite the explicit instruction\n// not to. Same pattern used across P01-P10 and M01-M04.\n\nconst rawText = $input.first().json.content[0].text;\nconst stripped = rawText.replace(/```json\\s*|```/g, '').trim();\n\nlet brief;\ntry {\n  brief = JSON.parse(stripped);\n} catch (e) {\n  throw new Error(`Failed to parse SEO brief JSON: ${e.message}. Raw text: ${stripped.substring(0, 300)}`);\n}\n\nreturn [\n  {\n    json: {\n      ...brief,\n      competitor_data: $('Simulated Competitor Research [MOCK]').first().json.competitor_data\n    }\n  }\n];"
+      },
+      "id": "a1f3d8c0-0006-4a00-9000-000000000006",
+      "name": "Parse SEO Brief",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"claude-sonnet-4-6\",\n  max_tokens: 4096,\n  messages: [\n    {\n      role: \"user\",\n      content: `Write a complete SEO-optimized blog article following this brief exactly:\\n\\n${JSON.stringify($json, null, 2)}\\n\\nRequirements:\\n- Use the recommended_title as the H1\\n- Cover every heading in required_headings, in a sensible order\\n- Naturally include the related_keywords throughout, no keyword stuffing\\n- Address at least one of the content_gaps explicitly\\n- Target the recommended_word_count (within 10%)\\n- Write in clean Markdown\\n\\nReturn ONLY raw JSON (no markdown fences around the JSON object itself, though the article_body value should contain markdown) matching exactly:\\n{\\n  \\\"article_title\\\": string,\\n  \\\"article_body_markdown\\\": string,\\n  \\\"word_count\\\": number,\\n  \\\"meta_description\\\": string\\n}`\n    }\n  ]\n}) }}"
+      },
+      "id": "a1f3d8c0-0007-4a00-9000-000000000007",
+      "name": "Claude: Draft Article",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $input.first().json.content[0].text;\nconst stripped = rawText.replace(/```json\\s*|```/g, '').trim();\n\nlet draft;\ntry {\n  draft = JSON.parse(stripped);\n} catch (e) {\n  throw new Error(`Failed to parse article draft JSON: ${e.message}. Raw text: ${stripped.substring(0, 300)}`);\n}\n\nreturn [\n  {\n    json: {\n      ...draft,\n      brief: $('Parse SEO Brief').first().json\n    }\n  }\n];"
+      },
+      "id": "a1f3d8c0-0008-4a00-9000-000000000008",
+      "name": "Parse Article Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"claude-sonnet-4-6\",\n  max_tokens: 2048,\n  messages: [\n    {\n      role: \"user\",\n      content: `You are reviewing your own draft against its brief. This is a self-review step in an agentic pipeline - be genuinely critical, not just affirming.\\n\\nBrief:\\n${JSON.stringify($json.brief, null, 2)}\\n\\nDraft:\\nTitle: ${$json.article_title}\\nWord count: ${$json.word_count}\\nBody:\\n${$json.article_body_markdown}\\n\\nCheck specifically:\\n1. Are ALL required_headings from the brief present in the draft?\\n2. Is word_count within 10% of recommended_word_count?\\n3. Are related_keywords present naturally (not stuffed)?\\n4. Is at least one content_gap addressed?\\n\\nReturn ONLY raw JSON matching exactly:\\n{\\n  \\\"passes_review\\\": boolean,\\n  \\\"missing_headings\\\": string[],\\n  \\\"word_count_ok\\\": boolean,\\n  \\\"keywords_ok\\\": boolean,\\n  \\\"gap_addressed\\\": boolean,\\n  \\\"revision_instructions\\\": string\\n}\\n\\nSet passes_review to false if ANY check fails. If it fails, revision_instructions should be specific and actionable.`\n    }\n  ]\n}) }}"
+      },
+      "id": "a1f3d8c0-0009-4a00-9000-000000000009",
+      "name": "Claude: Self-Review Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $input.first().json.content[0].text;\nconst stripped = rawText.replace(/```json\\s*|```/g, '').trim();\n\nlet review;\ntry {\n  review = JSON.parse(stripped);\n} catch (e) {\n  throw new Error(`Failed to parse self-review JSON: ${e.message}. Raw text: ${stripped.substring(0, 300)}`);\n}\n\nreturn [\n  {\n    json: {\n      ...review,\n      draft: $('Parse Article Draft').first().json,\n      revision_count: ($('Parse Article Draft').first().json.revision_count || 0)\n    }\n  }\n];"
+      },
+      "id": "a1f3d8c0-0010-4a00-9000-000000000010",
+      "name": "Parse Self-Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 380]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "review-condition-1",
+              "leftValue": "={{ $json.passes_review }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1f3d8c0-0011-4a00-9000-000000000011",
+      "name": "Passes Review?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1980, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "// AGENT LOOP GUARD: cap revisions at 2 attempts to prevent\n// thrashing - see Agentic AI Fundamentals Q12. If review still\n// fails after 2 revisions, route to human review instead of\n// looping indefinitely.\n\nconst current = $json.draft.revision_count || 0;\n\nif (current >= 2) {\n  return [{\n    json: {\n      ...$json,\n      revision_count: current,\n      escalate_to_human: true\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...$json,\n    revision_count: current + 1,\n    escalate_to_human: false\n  }\n}];"
+      },
+      "id": "a1f3d8c0-0012-4a00-9000-000000000012",
+      "name": "Check Revision Count",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 540]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "escalate-condition-1",
+              "leftValue": "={{ $json.escalate_to_human }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1f3d8c0-0013-4a00-9000-000000000013",
+      "name": "Max Revisions Hit?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2200, 540]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"claude-sonnet-4-6\",\n  max_tokens: 4096,\n  messages: [\n    {\n      role: \"user\",\n      content: `Revise this article draft based on the review feedback below. Keep what works, fix what's flagged.\\n\\nOriginal brief:\\n${JSON.stringify($json.draft.brief, null, 2)}\\n\\nOriginal draft:\\nTitle: ${$json.draft.article_title}\\nBody:\\n${$json.draft.article_body_markdown}\\n\\nReview feedback (fix these specifically):\\nMissing headings: ${JSON.stringify($json.missing_headings)}\\nWord count ok: ${$json.word_count_ok}\\nKeywords ok: ${$json.keywords_ok}\\nGap addressed: ${$json.gap_addressed}\\nInstructions: ${$json.revision_instructions}\\n\\nReturn ONLY raw JSON matching exactly:\\n{\\n  \\\"article_title\\\": string,\\n  \\\"article_body_markdown\\\": string,\\n  \\\"word_count\\\": number,\\n  \\\"meta_description\\\": string\\n}`\n    }\n  ]\n}) }}"
+      },
+      "id": "a1f3d8c0-0014-4a00-9000-000000000014",
+      "name": "Claude: Revise Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 680]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $input.first().json.content[0].text;\nconst stripped = rawText.replace(/```json\\s*|```/g, '').trim();\n\nlet revised;\ntry {\n  revised = JSON.parse(stripped);\n} catch (e) {\n  throw new Error(`Failed to parse revised draft JSON: ${e.message}. Raw text: ${stripped.substring(0, 300)}`);\n}\n\nconst priorRevisionCount = $('Check Revision Count').first().json.revision_count;\n\nreturn [\n  {\n    json: {\n      ...revised,\n      brief: $('Check Revision Count').first().json.draft.brief,\n      revision_count: priorRevisionCount\n    }\n  }\n];"
+      },
+      "id": "a1f3d8c0-0015-4a00-9000-000000000015",
+      "name": "Parse Revised Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2420, 680]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final payload shaped for WordPress REST API.\n// SWAP POINT for live posting - see WordPress node below.\n\nconst article = $json.draft || $json;\n\nreturn [{\n  json: {\n    title: article.article_title,\n    content: article.article_body_markdown,\n    excerpt: article.meta_description,\n    status: \"draft\",\n    meta: {\n      meta_description: article.meta_description\n    },\n    pipeline_status: $('Max Revisions Hit?').isExecuted\n      ? \"published_after_max_revisions_human_flagged\"\n      : \"published_after_passing_review\"\n  }\n}];"
+      },
+      "id": "a1f3d8c0-0016-4a00-9000-000000000016",
+      "name": "Prepare WordPress Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 460]
+    },
+    {
+      "parameters": {
+        "resource": "post",
+        "operation": "create",
+        "title": "={{ $json.title }}",
+        "additionalFields": {
+          "content": "={{ $json.content }}",
+          "excerpt": "={{ $json.excerpt }}",
+          "status": "draft"
+        }
+      },
+      "id": "a1f3d8c0-0017-4a00-9000-000000000017",
+      "name": "WordPress: Create Draft Post [UNVALIDATED]",
+      "type": "n8n-nodes-base.wordpress",
+      "typeVersion": 1,
+      "position": [2860, 460],
+      "notes": "UNVALIDATED: No live WordPress site was available to test this node end-to-end. Node configuration follows n8n's documented WordPress node schema (resource: post, operation: create) and the WordPress REST API's expected fields (title, content, excerpt, status). Requires WordPress Application Password credentials configured in n8n before use. Verify against a real site before relying on this in production."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Logging step - same dual-visibility pattern as M03\n// (Invoice Tracker): one row per run, status visible at a glance.\n\nconst payload = $('Prepare WordPress Payload').first().json;\n\nreturn [{\n  json: {\n    run_timestamp: new Date().toISOString(),\n    target_keyword: $('Set Target Keyword').first().json.target_keyword,\n    article_title: payload.title,\n    word_count: payload.content ? payload.content.split(/\\s+/).length : null,\n    pipeline_status: payload.pipeline_status,\n    wordpress_status: \"draft (unvalidated - see node notes)\"\n  }\n}];"
+      },
+      "id": "a1f3d8c0-0018-4a00-9000-000000000018",
+      "name": "Prepare Run Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3080, 460]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": "={{ $credentials.notionApi.databaseId }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Run Timestamp",
+              "title": "={{ $json.run_timestamp }}"
+            },
+            {
+              "key": "Target Keyword",
+              "richTextValue": "={{ $json.target_keyword }}"
+            },
+            {
+              "key": "Article Title",
+              "richTextValue": "={{ $json.article_title }}"
+            },
+            {
+              "key": "Pipeline Status",
+              "richTextValue": "={{ $json.pipeline_status }}"
+            },
+            {
+              "key": "WordPress Status",
+              "richTextValue": "={{ $json.wordpress_status }}"
+            }
+          ]
+        }
+      },
+      "id": "a1f3d8c0-0019-4a00-9000-000000000019",
+      "name": "Log Run to Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [3300, 460]
+    }
+  ],
+  "connections": {
+    "Weekly Schedule Trigger": {
+      "main": [[{ "node": "Set Target Keyword", "type": "main", "index": 0 }]]
+    },
+    "Manual Webhook Trigger": {
+      "main": [[{ "node": "Set Target Keyword", "type": "main", "index": 0 }]]
+    },
+    "Set Target Keyword": {
+      "main": [[{ "node": "Simulated Competitor Research [MOCK]", "type": "main", "index": 0 }]]
+    },
+    "Simulated Competitor Research [MOCK]": {
+      "main": [[{ "node": "Claude: Generate SEO Brief", "type": "main", "index": 0 }]]
+    },
+    "Claude: Generate SEO Brief": {
+      "main": [[{ "node": "Parse SEO Brief", "type": "main", "index": 0 }]]
+    },
+    "Parse SEO Brief": {
+      "main": [[{ "node": "Claude: Draft Article", "type": "main", "index": 0 }]]
+    },
+    "Claude: Draft Article": {
+      "main": [[{ "node": "Parse Article Draft", "type": "main", "index": 0 }]]
+    },
+    "Parse Article Draft": {
+      "main": [[{ "node": "Claude: Self-Review Draft", "type": "main", "index": 0 }]]
+    },
+    "Claude: Self-Review Draft": {
+      "main": [[{ "node": "Parse Self-Review", "type": "main", "index": 0 }]]
+    },
+    "Parse Self-Review": {
+      "main": [[{ "node": "Passes Review?", "type": "main", "index": 0 }]]
+    },
+    "Passes Review?": {
+      "main": [
+        [{ "node": "Prepare WordPress Payload", "type": "main", "index": 0 }],
+        [{ "node": "Check Revision Count", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Revision Count": {
+      "main": [[{ "node": "Max Revisions Hit?", "type": "main", "index": 0 }]]
+    },
+    "Max Revisions Hit?": {
+      "main": [
+        [{ "node": "Prepare WordPress Payload", "type": "main", "index": 0 }],
+        [{ "node": "Claude: Revise Draft", "type": "main", "index": 0 }]
+      ]
+    },
+    "Claude: Revise Draft": {
+      "main": [[{ "node": "Parse Revised Draft", "type": "main", "index": 0 }]]
+    },
+    "Parse Revised Draft": {
+      "main": [[{ "node": "Claude: Self-Review Draft", "type": "main", "index": 0 }]]
+    },
+    "Prepare WordPress Payload": {
+      "main": [[{ "node": "WordPress: Create Draft Post [UNVALIDATED]", "type": "main", "index": 0 }]]
+    },
+    "WordPress: Create Draft Post [UNVALIDATED]": {
+      "main": [[{ "node": "Prepare Run Log", "type": "main", "index": 0 }]]
+    },
+    "Prepare Run Log": {
+      "main": [[{ "node": "Log Run to Notion", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
